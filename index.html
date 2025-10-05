@@ -53,14 +53,14 @@
         const startOverlay = document.getElementById('start-overlay');
         const gameOverDiv = document.getElementById('game-over');
 
-        // Constants (Easier mode)
+        // Constants (Easier mode with smaller jumps)
         const BIRD_X = 50;
         const BIRD_RADIUS = 20;
         const PIPE_WIDTH = 50;
         const PIPE_GAP = 200;
         const PIPE_SPEED = 2.5;
         const GRAVITY = 0.4;
-        const FLAP_STRENGTH = -12;
+        const FLAP_STRENGTH = -8; // Smaller jump (was -12)
         const POWERUP_DURATION = 240;
         const FPS = 60;
 
@@ -78,7 +78,7 @@
         // High score
         const HIGH_SCORE_KEY = 'flappyHighScore';
 
-        // Clouds
+        // Clouds - DECLARED ONCE HERE
         let clouds = [];
         class Cloud {
             constructor() {
@@ -115,7 +115,7 @@
 
             flap() {
                 this.vel = FLAP_STRENGTH;
-                this.rotation = -0.3;
+                this.rotation = -0.2; // Subtler tilt (was -0.3)
                 this.flapTimer = 10;
             }
 
@@ -292,17 +292,17 @@
             }
         }
 
-        // Game state (clouds already declared above, so no 'let' here)
+        // Game state
         let bird = new Bird();
         let pipes = [];
         let powerups = [];
         let score = 0;
         let highScore = localStorage.getItem(HIGH_SCORE_KEY) || 0;
-        let gameStarted = false; // New: Track if started
+        let gameStarted = false;
         let gameOver = false;
         let powerupSpawnTimer = 0;
         let animationId;
-        // clouds = []; // Already declared above - init here
+        // Initialize clouds (no duplicate declaration)
         for (let i = 0; i < 5; i++) clouds.push(new Cloud());
 
         function initialDraw() {
