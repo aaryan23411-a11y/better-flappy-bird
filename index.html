@@ -18,8 +18,9 @@
         canvas {
             border: 1px solid #ccc;
             touch-action: none;
+            background: #87CEEB; /* Fallback blue if JS fails */
         }
-        #game-over {
+        #start-overlay, #game-over {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -27,33 +28,40 @@
             text-align: center;
             color: white;
             font-size: 24px;
-            display: none;
             background: rgba(0,0,0,0.7);
             padding: 20px;
             border-radius: 10px;
         }
+        #start-overlay { display: block; } /* Starts visible */
+        #game-over { display: none; }
     </style>
 </head>
 <body>
     <canvas id="gameCanvas" width="400" height="600"></canvas>
+    <div id="start-overlay">
+        <div>Better Flappy Bird</div>
+        <div>Tap/Click/Space to Play!</div>
+    </div>
     <div id="game-over">
         <div>Game Over!</div>
         <div>Tap/Click/Space to Restart</div>
     </div>
     <script>
+        console.log('JS loaded - starting game setup'); // Debug
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const startOverlay = document.getElementById('start-overlay');
         const gameOverDiv = document.getElementById('game-over');
 
         // Constants (Easier mode)
         const BIRD_X = 50;
         const BIRD_RADIUS = 20;
         const PIPE_WIDTH = 50;
-        const PIPE_GAP = 200; // Wider
-        const PIPE_SPEED = 2.5; // Slower
-        const GRAVITY = 0.4; // Gentler
-        const FLAP_STRENGTH = -12; // Stronger
-        const POWERUP_DURATION = 240; // 4 seconds at 60 FPS
+        const PIPE_GAP = 200;
+        const PIPE_SPEED = 2.5;
+        const GRAVITY = 0.4;
+        const FLAP_STRENGTH = -12;
+        const POWERUP_DURATION = 240;
         const FPS = 60;
 
         // Colors
@@ -64,13 +72,13 @@
         const BLUE = '#0000FF';
         const RED = '#FF0000';
         const GOLD = '#FFD700';
-        const BROWN = '#8B4513'; // For beak/tail
-        const GRAY = '#CCCCCC'; // Shadows
+        const BROWN = '#8B4513';
+        const GRAY = '#CCCCCC';
 
         // High score
         const HIGH_SCORE_KEY = 'flappyHighScore';
 
-        // Clouds for background
+        // Clouds
         let clouds = [];
         class Cloud {
             constructor() {
@@ -101,27 +109,26 @@
                 this.invincible = false;
                 this.invincibleTimer = 0;
                 this.bobOffset = 0;
-                this.rotation = 0; // For flap animation
+                this.rotation = 0;
                 this.flapTimer = 0;
             }
 
             flap() {
                 this.vel = FLAP_STRENGTH;
-                this.rotation = -0.3; // Tilt up
-                this.flapTimer = 10; // Brief animation
+                this.rotation = -0.3;
+                this.flapTimer = 10;
             }
 
             update() {
                 this.vel += GRAVITY;
                 this.y += this.vel;
-                this.bobOffset = Math.sin(Date.now() / 200) * 3; // Gentle bob
+                this.bobOffset = Math.sin(Date.now() / 200) * 3;
                 if (this.flapTimer > 0) {
                     this.flapTimer--;
                     if (this.flapTimer === 0) this.rotation = 0;
                 } else {
-                    this.rotation = Math.min(this.vel / 20, 0.5); // Tilt down with speed
+                    this.rotation = Math.min(this.vel / 20, 0.5);
                 }
-
                 if (this.invincible) {
                     this.invincibleTimer--;
                     if (this.invincibleTimer <= 0) this.invincible = false;
@@ -137,7 +144,7 @@
                 ctx.beginPath();
                 ctx.arc(0, 0, BIRD_RADIUS, 0, Math.PI * 2);
                 ctx.fill();
-                // Wing (simple)
+                // Wing
                 ctx.fillStyle = this.invincible ? '#DDD' : '#FFD700';
                 ctx.beginPath();
                 ctx.ellipse(-10, 0, 15, 5, 0, 0, Math.PI * 2);
@@ -190,7 +197,7 @@
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x, 0, PIPE_WIDTH, this.topHeight);
                 ctx.fillRect(this.x, this.bottomY, PIPE_WIDTH, canvas.height - this.bottomY);
-                // Caps with texture
+                // Caps
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x - 5, this.topHeight - 20, PIPE_WIDTH + 10, 20);
                 ctx.fillRect(this.x - 5, this.bottomY, PIPE_WIDTH + 10, 20);
@@ -222,13 +229,10 @@
             draw() {
                 if (!this.collected) {
                     const glowSize = this.size + Math.sin(this.pulse) * 3;
-                    // Glow
                     ctx.fillStyle = `rgba(255, 215, 0, 0.5)`;
                     ctx.fillRect(this.x - 2, this.y - 2, glowSize + 4, glowSize + 4);
-                    // Main
                     ctx.fillStyle = GOLD;
                     ctx.fillRect(this.x, this.y, this.size, this.size);
-                    // Border
                     ctx.strokeStyle = WHITE;
                     ctx.lineWidth = 2;
                     ctx.strokeRect(this.x, this.y, this.size, this.size);
@@ -240,7 +244,6 @@
             }
         }
 
-        // Score pop-up
         let scorePops = [];
         class ScorePop {
             constructor(x, y) {
@@ -267,14 +270,12 @@
             }
         }
 
-        // Ground
         let groundX = 0;
         function drawGround() {
             groundX -= PIPE_SPEED;
             if (groundX <= -canvas.width) groundX = 0;
             ctx.fillStyle = '#90EE90';
             ctx.fillRect(0, canvas.height - 30, canvas.width, 30);
-            // Grass lines
             ctx.strokeStyle = GREEN;
             ctx.lineWidth = 2;
             for (let i = groundX % 20; i < canvas.width; i += 20) {
@@ -291,19 +292,40 @@
             }
         }
 
-        // Game state
+        // Game state (clouds already declared above, so no 'let' here)
         let bird = new Bird();
         let pipes = [];
         let powerups = [];
         let score = 0;
         let highScore = localStorage.getItem(HIGH_SCORE_KEY) || 0;
+        let gameStarted = false; // New: Track if started
         let gameOver = false;
         let powerupSpawnTimer = 0;
         let animationId;
-        let clouds = [];
-
-        // Init clouds
+        // clouds = []; // Already declared above - init here
         for (let i = 0; i < 5; i++) clouds.push(new Cloud());
+
+        function initialDraw() {
+            console.log('Initial draw called'); // Debug
+            // Sky
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height - 30);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(1, '#98FB98');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height - 30);
+            // Clouds
+            clouds.forEach(cloud => cloud.draw());
+            // Ground
+            drawGround();
+            // Bird (idle)
+            bird.draw();
+            // Scores (faded)
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            ctx.font = 'bold 24px Arial';
+            ctx.fillText(`High: ${highScore}`, 10, 30);
+        }
+
+        initialDraw(); // Draw static start screen immediately
 
         function spawnPipe() {
             if (pipes.length === 0 || pipes[pipes.length - 1].x < canvas.width - 200) {
@@ -313,7 +335,7 @@
 
         function spawnPowerUp() {
             powerupSpawnTimer++;
-            if (powerupSpawnTimer > 400 && Math.random() < 0.5) { // More frequent
+            if (powerupSpawnTimer > 400 && Math.random() < 0.5) {
                 powerups.push(new PowerUp(canvas.width));
                 powerupSpawnTimer = 0;
             }
@@ -325,12 +347,10 @@
                 if (pipes[i].isOffScreen()) {
                     pipes.splice(i, 1);
                 } else {
-                    // Score
                     if (pipes[i].x + PIPE_WIDTH < bird.x && pipes[i].x + PIPE_WIDTH + 5 > bird.x) {
                         score++;
                         scorePops.push(new ScorePop(bird.x + 20, bird.y));
                     }
-                    // Collision
                     const hitTop = bird.x + BIRD_RADIUS > pipes[i].x && bird.x - BIRD_RADIUS < pipes[i].x + PIPE_WIDTH &&
                                    bird.y - BIRD_RADIUS < pipes[i].topHeight;
                     const hitBottom = bird.x + BIRD_RADIUS > pipes[i].x && bird.x - BIRD_RADIUS < pipes[i].x + PIPE_WIDTH &&
@@ -348,7 +368,6 @@
                 if (powerups[i].isOffScreen()) {
                     powerups.splice(i, 1);
                 } else {
-                    // Collect
                     if (bird.x - BIRD_RADIUS < powerups[i].x + powerups[i].size &&
                         bird.x + BIRD_RADIUS > powerups[i].x &&
                         bird.y - BIRD_RADIUS < powerups[i].y + powerups[i].size &&
@@ -369,7 +388,7 @@
         }
 
         function checkBoundaries() {
-            if (bird.y + BIRD_RADIUS > canvas.height - 30 || bird.y - BIRD_RADIUS < 0) { // Account for ground
+            if (bird.y + BIRD_RADIUS > canvas.height - 30 || bird.y - BIRD_RADIUS < 0) {
                 if (!bird.invincible) endGame();
             }
         }
@@ -381,36 +400,47 @@
                 localStorage.setItem(HIGH_SCORE_KEY, highScore);
             }
             gameOverDiv.style.display = 'block';
+            startOverlay.style.display = 'none';
             cancelAnimationFrame(animationId);
+            console.log('Game over - score:', score); // Debug
         }
 
-        function restart() {
-            bird = new Bird();
+        function startGame() {
+            console.log('Game started!'); // Debug
+            gameStarted = true;
+            gameOver = false;
+            bird = new Bird(); // Reset bird
             pipes = [];
             powerups = [];
             scorePops = [];
             score = 0;
-            gameOver = false;
             powerupSpawnTimer = 0;
+            startOverlay.style.display = 'none';
             gameOverDiv.style.display = 'none';
             gameLoop();
         }
 
+        function restart() {
+            startOverlay.style.display = 'block';
+            gameOverDiv.style.display = 'none';
+            gameStarted = false;
+            cancelAnimationFrame(animationId);
+        }
+
         function draw() {
-            // Sky gradient
+            // Sky
             const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height - 30);
             gradient.addColorStop(0, '#87CEEB');
             gradient.addColorStop(1, '#98FB98');
             ctx.fillStyle = gradient;
             ctx.fillRect(0, 0, canvas.width, canvas.height - 30);
 
-            // Clouds
+            // Clouds update & draw
             clouds.forEach(cloud => {
                 cloud.update();
                 cloud.draw();
             });
 
-            // Ground
             drawGround();
 
             pipes.forEach(pipe => pipe.draw());
@@ -426,7 +456,7 @@
         }
 
         function gameLoop() {
-            if (!gameOver) {
+            if (gameStarted && !gameOver) {
                 bird.update();
                 spawnPipe();
                 spawnPowerUp();
@@ -434,16 +464,16 @@
                 updatePowerUps();
                 updateScorePops();
                 checkBoundaries();
-                draw();
-                animationId = requestAnimationFrame(gameLoop);
-            } else {
-                draw(); // Final frame
             }
+            draw();
+            animationId = requestAnimationFrame(gameLoop);
         }
 
-        // Input
+        // Input: Start or flap
         function handleInput() {
-            if (!gameOver) {
+            if (!gameStarted) {
+                startGame();
+            } else if (!gameOver) {
                 bird.flap();
             } else {
                 restart();
@@ -456,8 +486,7 @@
             if (e.code === 'Space') { e.preventDefault(); handleInput(); }
         });
 
-        // Start
-        gameLoop();
+        console.log('Setup complete - tap to play'); // Debug
     </script>
 </body>
 </html>
